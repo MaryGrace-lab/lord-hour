@@ -1,26 +1,74 @@
 @import "tailwindcss";
 
+/* Raw color variables – you can edit these values */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* New Royal Blue palette */
+  --color-primary: #1e3a8a;        /* Royal blue */
+  --color-primary-light: #1e40af;  /* Lighter royal blue */
+  --color-secondary: #2563eb;      /* Bright blue for secondary elements */
+  --color-accent: #f59e0b;         /* Warm amber gold */
+  --color-accent-light: #fbbf24;   /* Lighter amber gold */
+  --color-midnight: #0f1a3a;        /* Deep midnight blue */
+
+  --color-white: #ffffff;
+  --color-black: #0a0a0a;
+  --color-gray-50: #f9f8f6;
+  --color-gray-100: #f0efe8;
+  --color-gray-200: #ddd8cd;
+  --color-gray-300: #c5bdb0;
+  --color-gray-400: #a89e8e;
+  --color-gray-500: #8b7f6c;
+  --color-gray-600: #6e6454;
+  --color-gray-700: #50493c;
+  --color-gray-800: #363128;
+  --color-gray-900: #1e1a14;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* Map semantic tokens to Tailwind utilities */
+@theme {
+  --color-primary: var(--color-primary);
+  --color-primary-light: var(--color-primary-light);
+  --color-secondary: var(--color-secondary);
+  --color-accent: var(--color-accent);
+  --color-accent-light: var(--color-accent-light);
+  --color-white: var(--color-white);
+  --color-black: var(--color-black);
+  --color-gray-50: var(--color-gray-50);
+  --color-gray-100: var(--color-gray-100);
+  --color-gray-200: var(--color-gray-200);
+  --color-gray-300: var(--color-gray-300);
+  --color-gray-400: var(--color-gray-400);
+  --color-gray-500: var(--color-gray-500);
+  --color-gray-600: var(--color-gray-600);
+  --color-gray-700: var(--color-gray-700);
+  --color-gray-800: var(--color-gray-800);
+  --color-gray-900: var(--color-gray-900);
+  --color-midnight: var(--color-midnight);
+
+  /* Semantic colors required by shadcn/ui and our components */
+  --color-background: var(--color-gray-50);
+  --color-foreground: var(--color-gray-900);
+  --color-card: var(--color-white);
+  --color-card-foreground: var(--color-gray-900);
+  --color-popover: var(--color-white);
+  --color-popover-foreground: var(--color-gray-900);
+  --color-muted: var(--color-gray-100);
+  --color-muted-foreground: var(--color-gray-600);
+  --color-border: var(--color-gray-200);
+  --color-input: var(--color-gray-200);
+  --color-ring: var(--color-accent);
+  --color-destructive: #dc2626;
+  --color-destructive-foreground: var(--color-white);
+
+  /* Fonts */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-heading: 'Georgia', 'Times New Roman', serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/* Base styles */
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
