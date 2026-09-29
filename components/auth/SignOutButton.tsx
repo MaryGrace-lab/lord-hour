@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import {
   Dialog,
   DialogContent,
@@ -14,19 +15,17 @@ import {
 import { Button } from "@/components/ui/button";
 
 export function SignOutButton() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   const handleSignOut = async () => {
     setIsSigningOut(true);
     try {
-      // Redirect immediately; the browser will navigate away, but if the
-      // network stalls we still release the button after a timeout.
       await signOut({ callbackUrl: "/bible-college/portal/login" });
     } catch (err) {
       console.error("Sign out failed:", err);
-      // Fallback: force a hard navigation to the login page.
-      window.location.href = "/bible-college/portal/login";
+      router.push("/bible-college/portal/login");
     } finally {
       setIsSigningOut(false);
     }

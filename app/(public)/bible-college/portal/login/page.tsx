@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { signIn, useSession } from "next-auth/react";
+import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,6 @@ const ROLE_HOME: Record<string, string> = {
 
 function safeCallback(url: string | null): string | null {
   if (!url) return null;
-  // Only allow relative paths — prevents open redirect.
   if (!url.startsWith("/") || url.startsWith("//")) return null;
   return url;
 }
@@ -27,20 +26,41 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { data: session, status } = useSession();
 
   const callbackUrl = safeCallback(searchParams.get("callbackUrl"));
 
-  // If already authenticated, bounce to the right portal immediately.
+  // If already authenticated, redirect to the correct portal.
+  // We fetch the session directly instead of using useSession() to avoid
+  // requiring a <SessionProvider> at the root of the app.
   useEffect(() => {
-    if (status === "authenticated" && session?.user?.role) {
-      const role = session.user.role as keyof typeof ROLE_HOME;
-      const home = callbackUrl || ROLE_HOME[role] || "/";
-      router.replace(home);
+    let cancelled = false;
+
+    async function checkSession() {
+      try {
+        const res = await fetch("/api/auth/session", { cache: "no-store" });
+        const session = await res.json();
+        if (cancelled) return;
+
+        const role = session?.user?.role as string | undefined;
+        if (role) {
+          const home = callbackUrl || ROLE_HOME[role] || "/";
+          router.replace(home);
+          return;
+        }
+      } catch {
+        // Silent — user just sees the login form.
+      }
+      if (!cancelled) setCheckingSession(false);
     }
-  }, [status, session, callbackUrl, router]);
+
+    checkSession();
+    return () => {
+      cancelled = true;
+    };
+  }, [callbackUrl, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,8 +106,8 @@ export default function LoginPage() {
           cache: "no-store",
         });
         const sessionData = await sessionRes.json();
-        const role = sessionData?.user?.role as keyof typeof ROLE_HOME;
-        const home = callbackUrl || ROLE_HOME[role] || "/student";
+        const role = sessionData?.user?.role as string | undefined;
+        const home = callbackUrl || (role ? ROLE_HOME[role] : null) || "/student";
         router.replace(home);
         return;
       }
@@ -98,10 +118,9 @@ export default function LoginPage() {
     }
   };
 
-  // Show a lightweight loading state while session status resolves.
-  if (status === "loading") {
+  if (checkingSession) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center bg-gray-50 px-4">
+      <div className="min-h-[70vh] flex items-center justify-center bg-gray-50 px-4 py-12">
         <div className="flex flex-col items-center gap-3">
           <div
             className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin"
