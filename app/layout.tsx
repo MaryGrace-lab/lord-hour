@@ -9,7 +9,7 @@ import { Toaster } from "react-hot-toast";
  */
 const APP_URL =
   process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ??
-  "http://localhost:3000";
+  "https://thelordshourministry.org/";
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
@@ -76,6 +76,9 @@ export const metadata: Metadata = {
     icon: "/favicon.ico",
     shortcut: "/favicon.ico",
     apple: "/favicon.ico",
+  },
+  verification: {
+  google: "google-site-verification: googleab737da5f11ed613.html", // the code from Google
   },
 };
 
