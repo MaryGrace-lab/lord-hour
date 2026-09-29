@@ -2,6 +2,8 @@ export type Branch = {
   name: string;
   slug: string;
   country: string;
+  region: "Africa" | "Europe";
+  flag: string;
   city: string;
   address: string;
   phone?: string;
@@ -11,18 +13,23 @@ export type Branch = {
   serviceTimes: { day: string; time: string }[];
   description?: string;
   imageUrl?: string;
-  mapEmbedUrl?: string; // Google Maps embed URL (without API key)
+  /** OpenStreetMap embed URL — no API key needed, never blocked */
+  mapEmbedUrl?: string;
+  /** Google Maps directions link */
+  directionsUrl?: string;
 };
 
 export const branches: Branch[] = [
   {
     name: "The Lord's Hour Ministries – San Donato (Headquarters)",
     slug: "san-donato",
-    country: "Italy (Headquarter)",
+    country: "Italy",
+    region: "Europe",
+    flag: "🇮🇹",
     city: "San Donato",
     address: "Via Cappi 26 Castelleone 26012 (C.R), Italy",
-    phone: "+39 (please add phone)",
-    email: "Thelordshourministriesinc@gmail.com",
+    phone: "+39 351 194 3365",
+    email: "thelordshourministriesinc@gmail.com",
     pastor: "Apostle Oghale B. Uwubiti",
     assistantPastor: "Rev. Abies Uwubiti Imarhia",
     serviceTimes: [
@@ -32,18 +39,22 @@ export const branches: Branch[] = [
     ],
     description:
       "Our international headquarters, established in 2019, leads the global vision of The Lord's Hour Ministries from Italy.",
-    imageUrl: "/lord-hour-1.jpeg", // Replace with actual image path
+    imageUrl: "/church-1.jpeg",
     mapEmbedUrl:
-      "https://www.google.com/maps?q=Via%20Cappi%2026%20Castelleone%2026012%20C.R%2C%20Italy&output=embed",
+      "https://www.openstreetmap.org/export/embed.html?bbox=9.7150%2C45.3400%2C9.7850%2C45.3950&layer=mapnik&marker=45.3667%2C9.7500",
+    directionsUrl:
+      "https://www.google.com/maps/dir/?api=1&destination=Via+Cappi+26+Castelleone+26012+CR+Italy",
   },
   {
     name: "The Lord's Hour Ministries – Benin City",
     slug: "benin-city",
     country: "Nigeria",
+    region: "Africa",
+    flag: "🇳🇬",
     city: "Benin City",
     address: "Boundary Street, Off Egba Road, Benin City, Edo State, Nigeria",
-    phone: "07085073850",
-    email: "Thelordshourministriesinc@gmail.com",
+    phone: "+234 708 507 3850",
+    email: "thelordshourministriesinc@gmail.com",
     pastor: "Pastor Martins Igbodo",
     assistantPastor: "Mins. Stanley Agbai",
     serviceTimes: [
@@ -53,8 +64,10 @@ export const branches: Branch[] = [
     ],
     description:
       "Our Benin City branch is the first local branch established in Nigeria. It serves as a center for worship, discipleship, and community outreach in Edo State.",
-    imageUrl: "/church-1.jpeg", // Replace with actual image path
+    imageUrl: "/church-2.jpeg",
     mapEmbedUrl:
-      "https://www.google.com/maps?q=Boundary%20Street%2C%20Off%20Egba%20Road%2C%20Benin%20City%2C%20Edo%20State%2C%20Nigeria&output=embed",
+      "https://www.openstreetmap.org/export/embed.html?bbox=5.5750%2C6.3100%2C5.6350%2C6.3650&layer=mapnik&marker=6.3350%2C5.6037",
+    directionsUrl:
+      "https://www.google.com/maps/dir/?api=1&destination=Boundary+Street+Off+Egba+Road+Benin+City+Edo+State+Nigeria",
   },
 ];

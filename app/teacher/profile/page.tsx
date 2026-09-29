@@ -1,46 +1,138 @@
-import Link from "next/link";
-import { prisma } from "@/lib/prisma";
+import { notFound, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { Role } from "@prisma/client";
+import { FaIdCard, FaBook } from "react-icons/fa";
 
 export default async function TeacherProfilePage() {
   const session = await auth();
-  const user = await prisma.user.findUnique({
-    where: { id: session?.user.id },
-    include: { teacherProfile: true },
-  });
+  if (!session?.user?.id || session.user.role !== Role.TEACHER) {
+    redirect("/bible-college/portal/login");
+  }
+  const teacherId = session.user.id;
+
+  const [user, courseCount] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: teacherId },
+      include: { teacherProfile: true },
+    }),
+    prisma.course.count({
+      where: { teachers: { some: { id: teacherId } } },
+    }),
+  ]);
+
+  if (!user) notFound();
+
+  const profile = user.teacherProfile;
+  const displayName =
+    [profile?.firstName, profile?.lastName].filter(Boolean).join(" ") ||
+    user.name ||
+    user.username;
+
+  const initials =
+    [profile?.firstName?.[0], profile?.lastName?.[0]]
+      .filter(Boolean)
+      .join("")
+      .toUpperCase() || user.username.slice(0, 2).toUpperCase();
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-primary">My Profile</h2>
-        <Link
-          href="/teacher/profile/edit"
-          className="text-accent hover:underline"
-        >
-          Edit Profile
-        </Link>
-      </div>
+    <div className="max-w-3xl mx-auto space-y-6">
+      <h1 className="text-2xl font-bold text-primary">My Profile</h1>
 
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <p className="text-sm font-medium text-gray-500">Username</p>
-            <p className="text-gray-900">{user?.username}</p>
+      {/* Identity card */}
+      <section className="bg-white rounded-lg shadow-sm p-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <div
+            className="shrink-0 w-16 h-16 rounded-full bg-primary text-white flex items-center justify-center text-xl font-bold"
+            aria-hidden
+          >
+            {initials}
           </div>
-          <div>
-            <p className="text-sm font-medium text-gray-500">Role</p>
-            <p className="text-gray-900">{user?.role}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-500">First Name</p>
-            <p className="text-gray-900">{user?.teacherProfile?.firstName || "Not set"}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-500">Last Name</p>
-            <p className="text-gray-900">{user?.teacherProfile?.lastName || "Not set"}</p>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-xl font-semibold text-gray-900 truncate">
+              {displayName}
+            </h2>
+            <p className="text-sm text-gray-500">@{user.username}</p>
+            <div className="flex flex-wrap gap-2 mt-2">
+              <span
+                className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full ${
+                  user.isActive
+                    ? "bg-green-100 text-green-700"
+                    : "bg-red-100 text-red-700"
+                }`}
+              >
+                {user.isActive ? "Active" : "Inactive"}
+              </span>
+              {profile?.staffId && (
+                <span className="inline-block px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-700">
+                  Staff ID: {profile.staffId}
+                </span>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      </section>
+
+      {/* Personal information */}
+      <section
+        className="bg-white rounded-lg shadow-sm p-6"
+        aria-labelledby="personal-info-heading"
+      >
+        <h2
+          id="personal-info-heading"
+          className="font-semibold text-primary mb-4"
+        >
+          Personal Information
+        </h2>
+        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+          <div>
+            <dt className="text-gray-500 mb-0.5">First Name</dt>
+            <dd className="text-gray-900">
+              {profile?.firstName || "Not set"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-gray-500 mb-0.5">Last Name</dt>
+            <dd className="text-gray-900">
+              {profile?.lastName || "Not set"}
+            </dd>
+          </div>
+          <div className="sm:col-span-2">
+            <dt className="text-gray-500 mb-0.5 flex items-center gap-1">
+              <FaIdCard aria-hidden /> Staff ID
+            </dt>
+            <dd className="text-gray-900">
+              {profile?.staffId || "Not assigned"}
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      {/* Teaching summary */}
+      <section
+        className="bg-white rounded-lg shadow-sm p-6"
+        aria-labelledby="teaching-summary-heading"
+      >
+        <h2
+          id="teaching-summary-heading"
+          className="font-semibold text-primary mb-4"
+        >
+          Teaching Summary
+        </h2>
+        <div className="flex items-center gap-3">
+          <FaBook className="text-accent text-2xl" aria-hidden />
+          <div>
+            <p className="text-2xl font-bold">{courseCount}</p>
+            <p className="text-sm text-gray-600">
+              Course{courseCount === 1 ? "" : "s"} Teaching
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <p className="text-sm text-gray-500 text-center">
+        To update your information, please contact the administrator.
+      </p>
     </div>
   );
 }

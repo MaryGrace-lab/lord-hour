@@ -1,52 +1,43 @@
 "use server";
 
-import cloudinary from "@/lib/cloudinary";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { Role } from "@prisma/client";
+import { recordMaterialSchema, validationError } from "@/lib/validations";
 
-// Allowed file extensions (lowercase)
-const ALLOWED_EXTENSIONS = ["pdf", "doc", "docx", "ppt", "pptx", "png", "jpg", "jpeg", "txt"];
-const MAX_FILE_SIZE_MB = 10;
-
-type CloudinaryUploadResult = {
-  secure_url: string;
-};
-
-export async function uploadMaterial(formData: FormData) {
+/**
+ * Records a material that was uploaded directly to Cloudinary by the browser.
+ * The actual file upload happens client-side (see app/api/cloudinary/sign),
+ * bypassing Next.js server-action body-size limits.
+ */
+export async function recordMaterial(
+  _prevState: { success: boolean; error?: string },
+  formData: FormData
+): Promise<{ success: boolean; error?: string }> {
   const session = await auth();
-  if (!session || session.user.role !== "TEACHER") {
-    throw new Error("Unauthorized");
-  }
-  const teacherId = session.user.id;
-
-  const lessonId = formData.get("lessonId")?.toString();
-  const file = formData.get("file") as File;
-
-  if (!lessonId || !file) {
-    throw new Error("Lesson and file are required");
+  if (!session || session.user.role !== Role.TEACHER) {
+    return { success: false, error: "Unauthorized" };
   }
 
-  const maxSizeBytes = MAX_FILE_SIZE_MB * 1024 * 1024;
-  if (file.size > maxSizeBytes) {
-    throw new Error("File is too large (max 10 MB)");
-  }
+  const parsed = recordMaterialSchema.safeParse({
+    lessonId: formData.get("lessonId"),
+    title: formData.get("title"),
+    fileUrl: formData.get("fileUrl"),
+    type: formData.get("type"),
+  });
+  if (!parsed.success) return validationError(parsed.error);
 
-  const fileName = file.name;
-  const fileExt = fileName.split(".").pop()?.toLowerCase() || "";
-  if (!ALLOWED_EXTENSIONS.includes(fileExt)) {
-    throw new Error("File type not allowed");
-  }
+  const { lessonId, title, fileUrl, type } = parsed.data;
 
+  // Ownership: this teacher must be assigned to the course that owns the lesson.
   const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
     include: {
       module: {
         include: {
           course: {
-            include: {
-              teachers: { where: { id: teacherId } },
-            },
+            include: { teachers: { where: { id: session.user.id } } },
           },
         },
       },
@@ -54,37 +45,18 @@ export async function uploadMaterial(formData: FormData) {
   });
 
   if (!lesson || lesson.module.course.teachers.length === 0) {
-    throw new Error("You are not authorized to upload to this lesson");
+    return { success: false, error: "Not authorized for this lesson" };
   }
 
-  const arrayBuffer = await file.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
+  try {
+    await prisma.material.create({
+      data: { title, fileUrl, type, lessonId },
+    });
 
-  const uploadResult = await new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      {
-        folder: "course_materials",
-        resource_type: "auto",
-        public_id: `${Date.now()}_${fileName.replace(/\s+/g, "_")}`,
-      },
-      (error, result) => {
-        if (error) reject(error);
-        else resolve(result);
-      }
-    );
-    stream.end(buffer);
-  });
-
-  const secureUrl = (uploadResult as CloudinaryUploadResult).secure_url;
-
-  await prisma.material.create({
-    data: {
-      title: fileName,
-      fileUrl: secureUrl,
-      type: fileExt,
-      lessonId,
-    },
-  });
-
-  revalidatePath(`/teacher/courses/${lesson.module.course.id}`);
+    revalidatePath(`/teacher/courses/${lesson.module.course.id}`);
+    return { success: true };
+  } catch (error) {
+    console.error("Record material error:", error);
+    return { success: false, error: "Unable to save material" };
+  }
 }

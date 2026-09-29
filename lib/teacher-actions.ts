@@ -2,71 +2,165 @@
 
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { revalidatePath } from "next/cache";
-import { Role, QuizStatus, AssignmentStatus, SubmissionStatus } from "@prisma/client";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { Role, QuizStatus, AssignmentStatus, SubmissionStatus, EnrollmentStatus } from "@prisma/client";
+import {
+  addModuleSchema,
+  createLessonSchema,
+  updateLessonSchema,
+  createAssignmentSchema,
+  gradeSubmissionSchema,
+  createQuizSchema,
+  addQuizQuestionSchema,
+  idOnlySchema,
+  validationError,
+} from "@/lib/validations";
+import { logAudit } from "@/lib/audit";
 
 // ─── Authorization helper ───
-async function isTeacherOfCourse(courseId: string, teacherId: string) {
+async function isTeacherOfCourse(
+  courseId: string,
+  teacherId: string
+): Promise<boolean> {
   const course = await prisma.course.findFirst({
     where: {
       id: courseId,
       teachers: { some: { id: teacherId } },
     },
+    select: { id: true },
   });
   return !!course;
 }
 
-// ─── Lessons & Modules ───
-
-export async function createLesson(formData: FormData) {
+async function requireTeacher() {
   const session = await auth();
-  if (!session || session.user.role !== Role.TEACHER) throw new Error("Unauthorized");
-  const teacherId = session.user.id;
+  if (!session || session.user.role !== Role.TEACHER) {
+    throw new Error("Unauthorized");
+  }
+  return session.user.id;
+}
 
-  const courseId = formData.get("courseId")?.toString();
-  const moduleId = formData.get("moduleId")?.toString();
-  const title = formData.get("title")?.toString();
-  const content = formData.get("content")?.toString() || null;
+// ────────────────────────────────────────────────
+// Modules
+// ────────────────────────────────────────────────
+export async function addModule(formData: FormData) {
+  const teacherId = await requireTeacher();
 
-  if (!courseId || !moduleId || !title) throw new Error("Missing required fields");
-  if (!(await isTeacherOfCourse(courseId, teacherId))) throw new Error("Not authorized");
+  const parsed = addModuleSchema.safeParse({
+    courseId: formData.get("courseId"),
+    title: formData.get("title"),
+  });
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const { courseId, title } = parsed.data;
+  if (!(await isTeacherOfCourse(courseId, teacherId))) {
+    throw new Error("Not authorized");
+  }
+
+  const maxOrder = await prisma.module.findFirst({
+    where: { courseId },
+    orderBy: { order: "desc" },
+    select: { order: true },
+  });
+
+  await prisma.module.create({
+    data: {
+      title,
+      courseId,
+      order: (maxOrder?.order ?? 0) + 1,
+    },
+  });
+
+  revalidatePath(`/teacher/courses/${courseId}/lessons`);
+  revalidatePath(`/student/courses/${courseId}`);
+}
+
+export async function deleteModule(formData: FormData) {
+  const teacherId = await requireTeacher();
+
+  const parsed = idOnlySchema.safeParse({ id: formData.get("moduleId") });
+  if (!parsed.success) throw new Error("Invalid module ID");
+
+  const courseModule = await prisma.module.findUnique({
+    where: { id: parsed.data.id },
+    select: { id: true, courseId: true },
+  });
+
+  if (
+    !courseModule ||
+    !(await isTeacherOfCourse(courseModule.courseId, teacherId))
+  ) {
+    throw new Error("Not authorized");
+  }
+
+  await prisma.module.delete({ where: { id: courseModule.id } });
+  revalidatePath(`/teacher/courses/${courseModule.courseId}/lessons`);
+  revalidatePath(`/student/courses/${courseModule.courseId}`);
+}
+
+// ────────────────────────────────────────────────
+// Lessons
+// ────────────────────────────────────────────────
+export async function createLesson(formData: FormData) {
+  const teacherId = await requireTeacher();
+
+  const parsed = createLessonSchema.safeParse({
+    courseId: formData.get("courseId"),
+    moduleId: formData.get("moduleId"),
+    title: formData.get("title"),
+    content: formData.get("content") || undefined,
+  });
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const { courseId, moduleId, title, content } = parsed.data;
+
+  if (!(await isTeacherOfCourse(courseId, teacherId))) {
+    throw new Error("Not authorized");
+  }
 
   const courseModule = await prisma.module.findFirst({
     where: { id: moduleId, courseId },
+    select: { id: true },
   });
   if (!courseModule) throw new Error("Module not found");
 
   const maxOrder = await prisma.lesson.findFirst({
     where: { moduleId },
     orderBy: { order: "desc" },
+    select: { order: true },
   });
 
   await prisma.lesson.create({
     data: {
       title,
-      content,
+      content: content ?? null,
       moduleId,
       order: (maxOrder?.order ?? 0) + 1,
     },
   });
 
   revalidatePath(`/teacher/courses/${courseId}/lessons`);
+  revalidatePath(`/student/courses/${courseId}`);
 }
 
 export async function updateLesson(formData: FormData) {
-  const session = await auth();
-  if (!session || session.user.role !== Role.TEACHER) throw new Error("Unauthorized");
-  const teacherId = session.user.id;
+  const teacherId = await requireTeacher();
 
-  const lessonId = formData.get("lessonId")?.toString();
-  const title = formData.get("title")?.toString();
-  const content = formData.get("content")?.toString() || null;
+  const parsed = updateLessonSchema.safeParse({
+    lessonId: formData.get("lessonId"),
+    title: formData.get("title"),
+    content: formData.get("content") || undefined,
+  });
+  if (!parsed.success) throw new Error("Invalid input");
 
-  if (!lessonId || !title) throw new Error("Missing required fields");
+  const { lessonId, title, content } = parsed.data;
 
   const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
-    include: { module: { include: { course: true } } },
+    select: {
+      id: true,
+      module: { select: { courseId: true } },
+    },
   });
 
   if (!lesson || !(await isTeacherOfCourse(lesson.module.courseId, teacherId))) {
@@ -75,77 +169,315 @@ export async function updateLesson(formData: FormData) {
 
   await prisma.lesson.update({
     where: { id: lessonId },
-    data: { title, content },
+    data: { title, content: content ?? null },
   });
 
   revalidatePath(`/teacher/courses/${lesson.module.courseId}/lessons`);
+  revalidatePath(
+    `/teacher/courses/${lesson.module.courseId}/lessons/${lessonId}`
+  );
+  revalidatePath(`/student/courses/${lesson.module.courseId}`);
 }
 
 export async function deleteLesson(formData: FormData) {
-  const session = await auth();
-  if (!session || session.user.role !== Role.TEACHER) throw new Error("Unauthorized");
-  const teacherId = session.user.id;
+  const teacherId = await requireTeacher();
 
-  const lessonId = formData.get("lessonId")?.toString();
-  if (!lessonId) throw new Error("Lesson ID required");
+  const parsed = idOnlySchema.safeParse({ id: formData.get("lessonId") });
+  if (!parsed.success) throw new Error("Invalid lesson ID");
 
   const lesson = await prisma.lesson.findUnique({
-    where: { id: lessonId },
-    include: { module: { include: { course: true } } },
+    where: { id: parsed.data.id },
+    select: {
+      id: true,
+      module: { select: { courseId: true } },
+    },
   });
 
   if (!lesson || !(await isTeacherOfCourse(lesson.module.courseId, teacherId))) {
     throw new Error("Not authorized");
   }
 
-  await prisma.lesson.delete({ where: { id: lessonId } });
+  await prisma.lesson.delete({ where: { id: lesson.id } });
   revalidatePath(`/teacher/courses/${lesson.module.courseId}/lessons`);
+  revalidatePath(`/student/courses/${lesson.module.courseId}`);
 }
 
-// ─── Materials ───
-
+// ────────────────────────────────────────────────
+// Materials
+// ────────────────────────────────────────────────
 export async function deleteMaterial(formData: FormData) {
-  const session = await auth();
-  if (!session || session.user.role !== Role.TEACHER) throw new Error("Unauthorized");
-  const teacherId = session.user.id;
+  const teacherId = await requireTeacher();
 
-  const materialId = formData.get("materialId")?.toString();
-  if (!materialId) throw new Error("Material ID required");
+  const parsed = idOnlySchema.safeParse({ id: formData.get("materialId") });
+  if (!parsed.success) throw new Error("Invalid material ID");
 
   const material = await prisma.material.findUnique({
-    where: { id: materialId },
-    include: { lesson: { include: { module: { include: { course: true } } } } },
+    where: { id: parsed.data.id },
+    select: {
+      id: true,
+      lesson: {
+        select: {
+          module: { select: { courseId: true } },
+        },
+      },
+    },
   });
 
-  if (!material || !(await isTeacherOfCourse(material.lesson.module.courseId, teacherId))) {
+  if (
+    !material ||
+    !(await isTeacherOfCourse(material.lesson.module.courseId, teacherId))
+  ) {
     throw new Error("Not authorized");
   }
 
-  await prisma.material.delete({ where: { id: materialId } });
-  revalidatePath(`/teacher/courses/${material.lesson.module.courseId}/materials`);
+  await prisma.material.delete({ where: { id: material.id } });
+  revalidatePath(
+    `/teacher/courses/${material.lesson.module.courseId}/materials`
+  );
+  revalidatePath(`/student/courses/${material.lesson.module.courseId}`);
 }
 
-// ─── Assignments ───
+// ────────────────────────────────────────────────
+// Course completion
+// ────────────────────────────────────────────────
 
+/**
+ * Returns the total number of lessons in a course (across all modules).
+ */
+async function getCourseLessonCount(courseId: string): Promise<number> {
+  return prisma.lesson.count({
+    where: { module: { courseId } },
+  });
+}
+
+/**
+ * Returns the number of distinct completed lessons for a student in a course.
+ */
+async function getCompletedLessonCount(
+  studentId: string,
+  courseId: string
+): Promise<number> {
+  const result = await prisma.lessonCompletion.findMany({
+    where: {
+      studentId,
+      lesson: { module: { courseId } },
+    },
+    select: { lessonId: true },
+    distinct: ["lessonId"],
+  });
+  return result.length;
+}
+
+export async function markEnrollmentComplete(formData: FormData) {
+  const teacherId = await requireTeacher();
+
+  const enrollmentId = formData.get("enrollmentId")?.toString();
+  if (!enrollmentId) throw new Error("Invalid enrollment ID");
+
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { id: enrollmentId },
+    select: {
+      id: true,
+      studentId: true,
+      courseId: true,
+      status: true,
+      course: {
+        select: {
+          id: true,
+          title: true,
+          teachers: { select: { id: true, username: true, name: true } },
+        },
+      },
+      student: {
+        select: {
+          id: true,
+          username: true,
+          name: true,
+          studentProfile: { select: { email: true, firstName: true, lastName: true } },
+        },
+      },
+    },
+  });
+
+  if (!enrollment) throw new Error("Enrollment not found");
+
+  // Teacher must own this course.
+  const teacherOwnsCourse = enrollment.course.teachers.some(
+    (t) => t.id === teacherId
+  );
+  if (!teacherOwnsCourse) {
+    throw new Error("Not authorized for this course");
+  }
+
+  if (enrollment.status === "COMPLETED") {
+    throw new Error("This student is already marked complete for this course");
+  }
+
+  // Require 100% lesson completion.
+  const [total, completed] = await Promise.all([
+    getCourseLessonCount(enrollment.courseId),
+    getCompletedLessonCount(enrollment.studentId, enrollment.courseId),
+  ]);
+
+  if (total === 0) {
+    throw new Error("This course has no lessons yet");
+  }
+  if (completed < total) {
+    throw new Error(
+      `This student has only completed ${completed} of ${total} lessons. ` +
+        `A course can only be marked complete when all lessons are done.`
+    );
+  }
+
+  await prisma.enrollment.update({
+    where: { id: enrollment.id },
+    data: {
+      status: "COMPLETED",
+      completedAt: new Date(),
+      completedById: teacherId,
+    },
+  });
+
+  const teacher = enrollment.course.teachers.find((t) => t.id === teacherId);
+  const teacherName =
+    teacher?.name || teacher?.username || "Your instructor";
+
+  const studentDisplayName =
+    [
+      enrollment.student.studentProfile?.firstName,
+      enrollment.student.studentProfile?.lastName,
+    ]
+      .filter(Boolean)
+      .join(" ") ||
+    enrollment.student.name ||
+    enrollment.student.username;
+
+  await logAudit({
+    userId: teacherId,
+    action: "ENROLLMENT_COMPLETED",
+    entity: "Enrollment",
+    entityId: enrollment.id,
+    metadata: {
+      studentUsername: enrollment.student.username,
+      courseTitle: enrollment.course.title,
+    },
+  });
+
+  // Send notification email. Failure must not roll back the completion.
+  const studentEmail = enrollment.student.studentProfile?.email;
+  if (studentEmail) {
+    try {
+      const { sendCourseCompletionEmail } = await import("@/lib/email");
+      await sendCourseCompletionEmail({
+        studentName: studentDisplayName,
+        studentEmail,
+        courseTitle: enrollment.course.title,
+        teacherName,
+      });
+    } catch (err) {
+      console.error("Course completion email failed:", err);
+    }
+  }
+
+  revalidatePath(`/teacher/courses/${enrollment.courseId}/students`);
+  revalidatePath("/teacher/courses");
+  revalidatePath("/student");
+  revalidatePath("/student/courses");
+  revalidateTag("admin-activity", "max");
+}
+
+export async function revertEnrollmentCompletion(formData: FormData) {
+  const teacherId = await requireTeacher();
+
+  const enrollmentId = formData.get("enrollmentId")?.toString();
+  if (!enrollmentId) throw new Error("Invalid enrollment ID");
+
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { id: enrollmentId },
+    select: {
+      id: true,
+      status: true,
+      courseId: true,
+      course: {
+        select: {
+          title: true,
+          teachers: { select: { id: true } },
+        },
+      },
+      student: { select: { username: true } },
+    },
+  });
+
+  if (!enrollment) throw new Error("Enrollment not found");
+
+  const teacherOwnsCourse = enrollment.course.teachers.some(
+    (t) => t.id === teacherId
+  );
+  if (!teacherOwnsCourse) {
+    throw new Error("Not authorized for this course");
+  }
+
+  if (enrollment.status !== "COMPLETED") {
+    throw new Error("This enrollment is not marked complete");
+  }
+
+  await prisma.enrollment.update({
+    where: { id: enrollment.id },
+    data: {
+      status: "ACTIVE",
+      completedAt: null,
+      completedById: null,
+    },
+  });
+
+  await logAudit({
+    userId: teacherId,
+    action: "ENROLLMENT_COMPLETION_REVERTED",
+    entity: "Enrollment",
+    entityId: enrollment.id,
+    metadata: {
+      studentUsername: enrollment.student.username,
+      courseTitle: enrollment.course.title,
+    },
+  });
+
+  revalidatePath(`/teacher/courses/${enrollment.courseId}/students`);
+  revalidatePath("/student");
+  revalidatePath("/student/courses");
+  revalidateTag("admin-activity", "max");
+}
+
+// ────────────────────────────────────────────────
+// Assignments
+// ────────────────────────────────────────────────
 export async function createAssignment(formData: FormData) {
-  const session = await auth();
-  if (!session || session.user.role !== Role.TEACHER) throw new Error("Unauthorized");
-  const teacherId = session.user.id;
+  const teacherId = await requireTeacher();
 
-  const courseId = formData.get("courseId")?.toString();
-  const title = formData.get("title")?.toString();
-  const description = formData.get("description")?.toString() || null;
-  const dueDate = formData.get("dueDate")?.toString();
-  const maxScore = parseInt(formData.get("maxScore")?.toString() || "20");
+  const parsed = createAssignmentSchema.safeParse({
+    courseId: formData.get("courseId"),
+    title: formData.get("title"),
+    description: formData.get("description") || undefined,
+    dueDate: formData.get("dueDate"),
+    maxScore: formData.get("maxScore"),
+  });
+  if (!parsed.success) throw new Error("Invalid input");
 
-  if (!courseId || !title || !dueDate) throw new Error("Missing required fields");
-  if (!(await isTeacherOfCourse(courseId, teacherId))) throw new Error("Not authorized");
+  const { courseId, title, description, dueDate, maxScore } = parsed.data;
+
+  if (!(await isTeacherOfCourse(courseId, teacherId))) {
+    throw new Error("Not authorized");
+  }
+
+  const dueDateObj = new Date(dueDate);
+  if (Number.isNaN(dueDateObj.getTime())) {
+    throw new Error("Invalid due date");
+  }
 
   await prisma.assignment.create({
     data: {
       title,
-      description,
-      dueDate: new Date(dueDate),
+      description: description ?? null,
+      dueDate: dueDateObj,
       maxScore,
       status: AssignmentStatus.DRAFT,
       courseId,
@@ -153,108 +485,147 @@ export async function createAssignment(formData: FormData) {
   });
 
   revalidatePath(`/teacher/courses/${courseId}/assignments`);
+  revalidatePath(`/student/assignments`);
 }
 
 export async function deleteAssignment(formData: FormData) {
-  const session = await auth();
-  if (!session || session.user.role !== Role.TEACHER) throw new Error("Unauthorized");
-  const teacherId = session.user.id;
+  const teacherId = await requireTeacher();
 
-  const assignmentId = formData.get("assignmentId")?.toString();
-  if (!assignmentId) throw new Error("Assignment ID required");
+  const parsed = idOnlySchema.safeParse({ id: formData.get("assignmentId") });
+  if (!parsed.success) throw new Error("Invalid assignment ID");
 
   const assignment = await prisma.assignment.findUnique({
-    where: { id: assignmentId },
-    include: { course: true },
+    where: { id: parsed.data.id },
+    select: { id: true, courseId: true },
   });
 
-  if (!assignment || !(await isTeacherOfCourse(assignment.courseId, teacherId))) {
+  if (
+    !assignment ||
+    !(await isTeacherOfCourse(assignment.courseId, teacherId))
+  ) {
     throw new Error("Not authorized");
   }
 
-  await prisma.assignment.delete({ where: { id: assignmentId } });
+  await prisma.assignment.delete({ where: { id: assignment.id } });
   revalidatePath(`/teacher/courses/${assignment.courseId}/assignments`);
+  revalidatePath(`/student/assignments`);
 }
 
 export async function publishAssignment(formData: FormData) {
-  const session = await auth();
-  if (!session || session.user.role !== Role.TEACHER) throw new Error("Unauthorized");
-  const teacherId = session.user.id;
+  const teacherId = await requireTeacher();
 
-  const assignmentId = formData.get("assignmentId")?.toString();
-  if (!assignmentId) throw new Error("Assignment ID required");
+  const parsed = idOnlySchema.safeParse({ id: formData.get("assignmentId") });
+  if (!parsed.success) throw new Error("Invalid assignment ID");
 
   const assignment = await prisma.assignment.findUnique({
-    where: { id: assignmentId },
-    include: { course: true },
+    where: { id: parsed.data.id },
+    select: { id: true, courseId: true, status: true },
   });
 
-  if (!assignment || !(await isTeacherOfCourse(assignment.courseId, teacherId))) {
+  if (
+    !assignment ||
+    !(await isTeacherOfCourse(assignment.courseId, teacherId))
+  ) {
     throw new Error("Not authorized");
   }
 
-  const newStatus = assignment.status === AssignmentStatus.PUBLISHED ? AssignmentStatus.DRAFT : AssignmentStatus.PUBLISHED;
+  const newStatus =
+    assignment.status === AssignmentStatus.PUBLISHED
+      ? AssignmentStatus.DRAFT
+      : AssignmentStatus.PUBLISHED;
+
   await prisma.assignment.update({
-    where: { id: assignmentId },
+    where: { id: assignment.id },
     data: { status: newStatus },
   });
 
   revalidatePath(`/teacher/courses/${assignment.courseId}/assignments`);
+  revalidatePath(`/student/assignments`);
 }
 
 export async function gradeSubmission(formData: FormData) {
-  const session = await auth();
-  if (!session || session.user.role !== Role.TEACHER) throw new Error("Unauthorized");
-  const teacherId = session.user.id;
+  const teacherId = await requireTeacher();
 
-  const submissionId = formData.get("submissionId")?.toString();
-  const score = parseInt(formData.get("score")?.toString() || "0");
-  const feedback = formData.get("feedback")?.toString() || null;
+  const parsed = gradeSubmissionSchema.safeParse({
+    submissionId: formData.get("submissionId"),
+    score: formData.get("score"),
+    feedback: formData.get("feedback") || undefined,
+  });
+  if (!parsed.success) throw new Error("Invalid input");
 
-  if (!submissionId) throw new Error("Submission ID required");
+  const { submissionId, score, feedback } = parsed.data;
 
   const submission = await prisma.assignmentSubmission.findUnique({
     where: { id: submissionId },
-    include: { assignment: { include: { course: true } } },
+    select: {
+      id: true,
+      assignmentId: true,
+      assignment: {
+        select: {
+          courseId: true,
+          maxScore: true,
+        },
+      },
+    },
   });
 
-  if (!submission || !(await isTeacherOfCourse(submission.assignment.courseId, teacherId))) {
+  if (
+    !submission ||
+    !(await isTeacherOfCourse(submission.assignment.courseId, teacherId))
+  ) {
     throw new Error("Not authorized");
+  }
+
+  // Business rule: score cannot exceed the assignment's max
+  if (score > submission.assignment.maxScore) {
+    throw new Error(
+      `Score cannot exceed the maximum of ${submission.assignment.maxScore}`
+    );
   }
 
   await prisma.assignmentSubmission.update({
     where: { id: submissionId },
     data: {
       score,
-      feedback,
+      feedback: feedback ?? null,
       status: SubmissionStatus.GRADED,
       gradedAt: new Date(),
     },
   });
 
-  revalidatePath(`/teacher/courses/${submission.assignment.courseId}/assignments/${submission.assignmentId}`);
+  revalidatePath(
+    `/teacher/courses/${submission.assignment.courseId}/assignments/${submission.assignmentId}`
+  );
+  revalidatePath(`/student/assignments/${submission.assignmentId}`);
+  revalidatePath(`/student/results`);
 }
 
-// ─── Quizzes ───
-
+// ────────────────────────────────────────────────
+// Quizzes
+// ────────────────────────────────────────────────
 export async function createQuiz(formData: FormData) {
-  const session = await auth();
-  if (!session || session.user.role !== Role.TEACHER) throw new Error("Unauthorized");
-  const teacherId = session.user.id;
+  const teacherId = await requireTeacher();
 
-  const courseId = formData.get("courseId")?.toString();
-  const title = formData.get("title")?.toString();
-  const description = formData.get("description")?.toString() || null;
-  const durationMinutes = parseInt(formData.get("durationMinutes")?.toString() || "30");
-  const passingScore = parseInt(formData.get("passingScore")?.toString() || "50");
+  const parsed = createQuizSchema.safeParse({
+    courseId: formData.get("courseId"),
+    title: formData.get("title"),
+    description: formData.get("description") || undefined,
+    durationMinutes: formData.get("durationMinutes"),
+    passingScore: formData.get("passingScore"),
+  });
+  if (!parsed.success) throw new Error("Invalid input");
 
-  if (!courseId || !title) throw new Error("Course and title required");
-  if (!(await isTeacherOfCourse(courseId, teacherId))) throw new Error("Not authorized");
+  const { courseId, title, description, durationMinutes, passingScore } =
+    parsed.data;
+
+  if (!(await isTeacherOfCourse(courseId, teacherId))) {
+    throw new Error("Not authorized");
+  }
 
   await prisma.quiz.create({
     data: {
       title,
-      description,
+      description: description ?? null,
       durationMinutes,
       passingScore,
       maxAttempts: 1,
@@ -264,81 +635,137 @@ export async function createQuiz(formData: FormData) {
   });
 
   revalidatePath(`/teacher/courses/${courseId}/quizzes`);
+  revalidatePath(`/student/quizzes`);
 }
 
 export async function deleteQuiz(formData: FormData) {
-  const session = await auth();
-  if (!session || session.user.role !== Role.TEACHER) throw new Error("Unauthorized");
-  const teacherId = session.user.id;
+  const teacherId = await requireTeacher();
 
-  const quizId = formData.get("quizId")?.toString();
-  if (!quizId) throw new Error("Quiz ID required");
+  const parsed = idOnlySchema.safeParse({ id: formData.get("quizId") });
+  if (!parsed.success) throw new Error("Invalid quiz ID");
 
   const quiz = await prisma.quiz.findUnique({
-    where: { id: quizId },
-    include: { course: true },
+    where: { id: parsed.data.id },
+    select: { id: true, courseId: true },
   });
 
   if (!quiz || !(await isTeacherOfCourse(quiz.courseId, teacherId))) {
     throw new Error("Not authorized");
   }
 
-  await prisma.quiz.delete({ where: { id: quizId } });
+  await prisma.quiz.delete({ where: { id: quiz.id } });
   revalidatePath(`/teacher/courses/${quiz.courseId}/quizzes`);
+  revalidatePath(`/student/quizzes`);
 }
 
 export async function publishQuiz(formData: FormData) {
-  const session = await auth();
-  if (!session || session.user.role !== Role.TEACHER) throw new Error("Unauthorized");
-  const teacherId = session.user.id;
+  const teacherId = await requireTeacher();
 
-  const quizId = formData.get("quizId")?.toString();
-  if (!quizId) throw new Error("Quiz ID required");
+  const parsed = idOnlySchema.safeParse({ id: formData.get("quizId") });
+  if (!parsed.success) throw new Error("Invalid quiz ID");
 
   const quiz = await prisma.quiz.findUnique({
-    where: { id: quizId },
-    include: { course: true },
+    where: { id: parsed.data.id },
+    select: {
+      id: true,
+      courseId: true,
+      status: true,
+      _count: { select: { questions: true } },
+    },
   });
 
   if (!quiz || !(await isTeacherOfCourse(quiz.courseId, teacherId))) {
     throw new Error("Not authorized");
   }
 
-  const newStatus = quiz.status === QuizStatus.PUBLISHED ? QuizStatus.DRAFT : QuizStatus.PUBLISHED;
+  // Refuse to publish a quiz with no questions.
+  if (
+    quiz.status !== QuizStatus.PUBLISHED &&
+    quiz._count.questions === 0
+  ) {
+    throw new Error("Cannot publish a quiz with no questions. Add questions first.");
+  }
+
+  const newStatus =
+    quiz.status === QuizStatus.PUBLISHED
+      ? QuizStatus.DRAFT
+      : QuizStatus.PUBLISHED;
+
   await prisma.quiz.update({
-    where: { id: quizId },
+    where: { id: quiz.id },
     data: { status: newStatus },
   });
 
   revalidatePath(`/teacher/courses/${quiz.courseId}/quizzes`);
+  revalidatePath(`/student/quizzes`);
 }
 
 export async function addQuizQuestion(formData: FormData) {
-  const session = await auth();
-  if (!session || session.user.role !== Role.TEACHER) throw new Error("Unauthorized");
-  const teacherId = session.user.id;
+  const teacherId = await requireTeacher();
 
-  const quizId = formData.get("quizId")?.toString();
-  const questionText = formData.get("questionText")?.toString();
-  const questionType = formData.get("questionType")?.toString() || "multiple_choice";
-  const marks = parseInt(formData.get("marks")?.toString() || "1");
-  const options = formData.get("options")?.toString() || null;
-  const correctAnswer = formData.get("correctAnswer")?.toString();
+  const parsed = addQuizQuestionSchema.safeParse({
+    quizId: formData.get("quizId"),
+    questionText: formData.get("questionText"),
+    questionType: formData.get("questionType") || "multiple_choice",
+    marks: formData.get("marks"),
+    options: formData.get("options") || undefined,
+    correctAnswer: formData.get("correctAnswer"),
+  });
+  if (!parsed.success) throw new Error("Invalid input");
 
-  if (!quizId || !questionText || !correctAnswer) throw new Error("Missing required fields");
+  const {
+    quizId,
+    questionText,
+    questionType,
+    marks,
+    options,
+    correctAnswer,
+  } = parsed.data;
 
   const quiz = await prisma.quiz.findUnique({
     where: { id: quizId },
-    include: { course: true },
+    select: { id: true, courseId: true },
   });
-
   if (!quiz || !(await isTeacherOfCourse(quiz.courseId, teacherId))) {
     throw new Error("Not authorized");
+  }
+
+  // Validate options for MCQ
+  let normalizedOptions: string | null = options ?? null;
+  if (questionType === "multiple_choice") {
+    if (!options) {
+      throw new Error("Multiple-choice questions require options");
+    }
+    let parsedOptions: unknown;
+    try {
+      parsedOptions = JSON.parse(options);
+    } catch {
+      throw new Error(
+        "Options must be a JSON array, e.g. [\"A\",\"B\",\"C\"]"
+      );
+    }
+    if (!Array.isArray(parsedOptions) || parsedOptions.length < 2) {
+      throw new Error("Provide at least two options");
+    }
+    const asStrings = parsedOptions.map((v) => String(v));
+    if (!asStrings.includes(correctAnswer)) {
+      throw new Error(
+        "Correct answer must exactly match one of the options"
+      );
+    }
+    normalizedOptions = JSON.stringify(asStrings);
+  } else if (questionType === "true_false") {
+    const lower = correctAnswer.toLowerCase();
+    if (lower !== "true" && lower !== "false") {
+      throw new Error("True/False answer must be \"true\" or \"false\"");
+    }
+    normalizedOptions = null;
   }
 
   const lastQuestion = await prisma.quizQuestion.findFirst({
     where: { quizId },
     orderBy: { order: "desc" },
+    select: { order: true },
   });
 
   await prisma.quizQuestion.create({
@@ -347,7 +774,7 @@ export async function addQuizQuestion(formData: FormData) {
       questionText,
       questionType,
       marks,
-      options,
+      options: normalizedOptions,
       correctAnswer,
       order: (lastQuestion?.order ?? 0) + 1,
     },
@@ -357,62 +784,29 @@ export async function addQuizQuestion(formData: FormData) {
 }
 
 export async function deleteQuizQuestion(formData: FormData) {
-  const session = await auth();
-  if (!session || session.user.role !== Role.TEACHER) throw new Error("Unauthorized");
-  const teacherId = session.user.id;
+  const teacherId = await requireTeacher();
 
-  const questionId = formData.get("questionId")?.toString();
-  if (!questionId) throw new Error("Question ID required");
+  const parsed = idOnlySchema.safeParse({ id: formData.get("questionId") });
+  if (!parsed.success) throw new Error("Invalid question ID");
 
   const question = await prisma.quizQuestion.findUnique({
-    where: { id: questionId },
-    include: { quiz: { include: { course: true } } },
+    where: { id: parsed.data.id },
+    select: {
+      id: true,
+      quizId: true,
+      quiz: { select: { courseId: true } },
+    },
   });
 
-  if (!question || !(await isTeacherOfCourse(question.quiz.courseId, teacherId))) {
+  if (
+    !question ||
+    !(await isTeacherOfCourse(question.quiz.courseId, teacherId))
+  ) {
     throw new Error("Not authorized");
   }
 
-  await prisma.quizQuestion.delete({ where: { id: questionId } });
-  revalidatePath(`/teacher/courses/${question.quiz.courseId}/quizzes/${question.quizId}`);
-}
-
-export async function updateTeacherProfileAction(
-  prevState: { success: boolean; error?: string },
-  formData: FormData
-): Promise<{ success: boolean; error?: string }> {
-  const session = await auth();
-  if (!session || session.user.role !== Role.TEACHER) {
-    return { success: false, error: "Unauthorized" };
-  }
-
-  const firstName = formData.get("firstName")?.toString() || null;
-  const lastName = formData.get("lastName")?.toString() || null;
-
-  try {
-    const teacher = await prisma.teacher.findUnique({
-      where: { userId: session.user.id },
-    });
-
-    if (teacher) {
-      await prisma.teacher.update({
-        where: { userId: session.user.id },
-        data: { firstName, lastName },
-      });
-    } else {
-      await prisma.teacher.create({
-        data: {
-          userId: session.user.id,
-          firstName,
-          lastName,
-        },
-      });
-    }
-
-    revalidatePath("/teacher/profile");
-    return { success: true };
-  } catch (error) {
-    console.error("Profile update error:", error);
-    return { success: false, error: "Unable to save changes." };
-  }
+  await prisma.quizQuestion.delete({ where: { id: question.id } });
+  revalidatePath(
+    `/teacher/courses/${question.quiz.courseId}/quizzes/${question.quizId}`
+  );
 }

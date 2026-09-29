@@ -1,33 +1,30 @@
-import { requireStudent } from "@/lib/auth";
 import Link from "next/link";
-import { SignOutButton } from "@/components/auth/SignOutButton";
+import { requireStudent } from "@/lib/auth";
+import { StudentSidebar } from "@/components/student/StudentSidebar";
 
 export default async function StudentLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Defense-in-depth: proxy.ts already gates /student.
   await requireStudent();
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="bg-white shadow-sm">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-primary">Student Portal</h1>
-          <SignOutButton />
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
+        <div className="container mx-auto px-4 py-3 flex justify-between items-center">
+          <Link
+            href="/student"
+            className="text-lg font-bold text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
+          >
+            Student Portal
+          </Link>
         </div>
       </header>
+
       <div className="container mx-auto px-4 py-6 flex flex-col md:flex-row gap-6">
-        <aside className="w-full md:w-64 bg-white rounded-lg shadow-md p-4">
-          <nav className="flex flex-wrap md:flex-col gap-2">
-            <Link href="/student">Dashboard</Link>
-            <Link href="/student/courses">My Courses</Link>
-            <Link href="/student/quizzes">Quizzes</Link>
-            <Link href="/student/assignments">Assignments</Link>
-            <Link href="/student/results">Results</Link>
-            <Link href="/student/profile">Profile</Link>
-          </nav>
-        </aside>
+        <StudentSidebar />
         <main className="flex-1">{children}</main>
       </div>
     </div>

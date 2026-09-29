@@ -1,79 +1,170 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 
 const heroImages = [
-  "/church-1.jpeg",
-  "/church-2.jpeg",
-  "/church-3.jpeg",
-  "/church-4.jpeg",
-  "/church-5.jpeg",
-  "/church-6.jpeg",
-  "/church-7.jpeg",
+  { src: "/church-1.jpeg", alt: "Congregation worshipping" },
+  { src: "/church-2.jpeg", alt: "Church gathering" },
+  { src: "/church-3.jpeg", alt: "Ministry in session" },
+  { src: "/church-4.jpeg", alt: "Worship service" },
+  { src: "/church-5.jpeg", alt: "Fellowship" },
+  { src: "/church-6.jpeg", alt: "Church community" },
+  { src: "/church-7.jpeg", alt: "Service in progress" },
 ];
 
+const SLIDE_DURATION = 6000;
+
 export function Hero() {
-  // Track the index of the currently displayed image
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [index, setIndex] = useState(0);
+  const [reducedMotion, setReducedMotion] = useState(false);
 
   useEffect(() => {
-    // Change the background image every 6 seconds
-    const interval = setInterval(() => {
-      setCurrentImageIndex((prevIndex) =>
-        prevIndex === heroImages.length - 1 ? 0 : prevIndex + 1
-      );
-    }, 6000);
-
-    // Clean up the interval when the component unmounts
-    return () => clearInterval(interval);
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReducedMotion(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
   }, []);
 
+  useEffect(() => {
+    if (reducedMotion) return;
+    const interval = setInterval(() => {
+      setIndex((prev) => (prev === heroImages.length - 1 ? 0 : prev + 1));
+    }, SLIDE_DURATION);
+    return () => clearInterval(interval);
+  }, [reducedMotion]);
+
   return (
-    <section className="relative h-[70vh] md:h-[80vh] lg:h-[90vh] overflow-hidden">
-      {/* Background images with crossfade transition */}
-      {heroImages.map((image, index) => (
-        <div
-          key={image}
-          className={`absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ${
-            index === currentImageIndex ? "opacity-100" : "opacity-0"
-          }`}
-          style={{ backgroundImage: `url(${image})` }}
-        />
-      ))}
+    <section className="relative h-[85dvh] min-h-[600px] max-h-[900px] overflow-hidden bg-midnight">
+      {/* Slideshow — only the current + next image are rendered */}
+      {heroImages.map((image, i) => {
+        const distance = (i - index + heroImages.length) % heroImages.length;
+        const isActive = i === index;
+        const isNext = distance === 1;
+        const shouldRender = isActive || isNext;
 
-      {/* Dark overlay to improve text readability */}
-      <div className="absolute inset-0 bg-black/50" />
+        if (!shouldRender) return null;
 
-      {/* Content container */}
-      <div className="relative z-10 container mx-auto px-4 h-full flex items-center justify-center text-center">
-        <div className="max-w-4xl">
-          <h1 className="font-heading text-4xl md:text-6xl font-bold text-white leading-tight mb-4">
-            WELCOME TO THE LORD&apos;S <span className="text-accent">HOUR</span> MINISTRIES
-            <span className="block text-2xl md:text-4xl mt-2">
-              Liberation Centre
-            </span>
-          </h1>
-          <p className="text-lg md:text-xl text-accent font-medium mb-4">
-            WORSHIP WITH US TODAY
-          </p>
-          <p className="text-lg md:text-xl text-gray-200 mb-2">
-            A People Prepared for His Coming
-          </p>
-          <p className="text-sm text-accent font-medium mb-8">Isaiah 42:6-7</p>
-          <p className="text-base md:text-lg text-gray-200 max-w-3xl mx-auto mb-10">
-            Experience God&apos;s presence. Grow in His Word. Live for His purpose.
-          </p>
-          <div className="flex flex-wrap justify-center gap-4">
-            <Button asChild size="lg" variant="default" className="bg-accent text-primary hover:bg-accent-light">
-              <Link href="/contact">Join Us</Link>
-            </Button>
-            <Button asChild size="lg" variant="outline" className="border-white text-white hover:bg-white/10">
-              <Link href="/media/live">Watch Live</Link>
-            </Button>
+        return (
+          <div
+            key={image.src}
+            className={`absolute inset-0 transition-opacity duration-[1200ms] ease-in-out ${
+              isActive ? "opacity-100" : "opacity-0"
+            }`}
+            aria-hidden={!isActive}
+          >
+            <Image
+              src={image.src}
+              alt={image.alt}
+              fill
+              sizes="100vw"
+              priority={i === 0}
+              quality={75}
+              className="object-cover"
+              style={{
+                animation:
+                  isActive && !reducedMotion
+                    ? `heroKenBurns ${SLIDE_DURATION + 2500}ms ease-out forwards`
+                    : "none",
+              }}
+            />
+          </div>
+        );
+      })}
+
+      {/* Overlays */}
+      <div className="absolute inset-0 bg-gradient-to-r from-midnight/95 via-midnight/70 to-midnight/25" aria-hidden />
+      <div className="absolute inset-0 bg-gradient-to-t from-midnight/70 via-transparent to-transparent" aria-hidden />
+
+      {/* Content */}
+      <div className="relative z-10 h-full flex items-center">
+        <div className="w-full max-w-7xl mx-auto px-6 md:px-10 lg:px-16">
+          <div className="max-w-xl">
+            <div className="flex items-center gap-3 mb-6">
+              <span className="block w-10 h-px bg-accent" aria-hidden />
+              <span className="text-accent text-[11px] md:text-xs tracking-[0.3em] uppercase font-medium">
+                The Lord&apos;s Hour Ministries
+              </span>
+            </div>
+
+            <h1 className="font-heading text-[2rem] sm:text-5xl md:text-6xl lg:text-[4.25rem] font-bold text-white leading-[1.08] tracking-tight mb-6">
+              A People Prepared
+              <br />
+              for His <span className="text-accent">Coming</span>
+            </h1>
+
+            <p className="text-base md:text-lg text-gray-200/90 leading-relaxed max-w-md mb-10">
+              Experience God&apos;s presence. Grow in His Word. Live for His
+              purpose.
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <Link
+                href="/contact"
+                className="inline-flex items-center justify-center gap-2 bg-accent text-midnight px-8 py-3.5 rounded-md font-semibold text-sm tracking-wide shadow-lg shadow-accent/20 hover:bg-accent-light hover:-translate-y-0.5 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              >
+                Join Us
+                <span aria-hidden="true">→</span>
+              </Link>
+            </div>
           </div>
         </div>
+      </div>
+
+      {/* Slide indicators */}
+      <div className="absolute bottom-8 md:bottom-10 left-6 md:left-10 lg:left-16 z-10 flex items-center gap-4">
+        <span className="text-white/90 text-xs font-mono tracking-widest">
+          {String(index + 1).padStart(2, "0")}
+        </span>
+        <div className="flex items-center gap-1">
+          {heroImages.map((_, i) => {
+            const isActive = i === index;
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setIndex(i)}
+                aria-label={`Go to slide ${i + 1}`}
+                aria-current={isActive ? "true" : undefined}
+                className="group relative min-w-[44px] min-h-[44px] flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-white rounded"
+              >
+                <span
+                  className={`block h-0.5 rounded-full transition-all duration-500 ${
+                    isActive
+                      ? "w-10 bg-white/25"
+                      : "w-3 bg-white/30 group-hover:bg-white/70"
+                  }`}
+                />
+                {isActive && (
+                  <span
+                    key={`progress-${index}`}
+                    className="absolute top-1/2 -translate-y-1/2 h-0.5 w-10 bg-accent rounded-full origin-left"
+                    style={{
+                      animation: reducedMotion
+                        ? "none"
+                        : `heroProgress ${SLIDE_DURATION}ms linear forwards`,
+                    }}
+                    aria-hidden
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <span className="hidden md:inline text-white/40 text-xs font-mono tracking-widest">
+          {String(heroImages.length).padStart(2, "0")}
+        </span>
+      </div>
+
+      {/* Scroll cue */}
+      <div
+        className="hidden lg:flex absolute bottom-10 right-16 z-10 flex-col items-center gap-3 text-white/50"
+        aria-hidden
+      >
+        <span className="text-[10px] tracking-[0.35em] uppercase">Scroll</span>
+        <span className="block w-px h-10 bg-gradient-to-b from-white/60 to-transparent" />
       </div>
     </section>
   );

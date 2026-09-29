@@ -1,66 +1,74 @@
 import type { Metadata } from "next";
-import Image from "next/image";
+import { PastorsLetter } from "@/components/about/PastorsLetter";
+
+const PAGE_TITLE = "Pastor's Message";
+const PAGE_DESCRIPTION =
+  "A welcome message from Apostle Oghale B. Uwubiti, Founder and Senior Pastor of The Lord's Hour Ministries.";
 
 export const metadata: Metadata = {
-  title: "Pastor's Message | The Lord's Hour Ministries",
-  description:
-    "A welcome message from Apostle Oghale B. Uwubiti, founder of The Lord's Hour Ministries.",
+  title: PAGE_TITLE,
+  description: PAGE_DESCRIPTION,
+  alternates: { canonical: "/about/pastors-message" },
+  openGraph: {
+    title: `${PAGE_TITLE} | The Lord's Hour Ministries`,
+    description: PAGE_DESCRIPTION,
+    url: "/about/pastors-message",
+  },
+  twitter: {
+    title: `${PAGE_TITLE} | The Lord's Hour Ministries`,
+    description: PAGE_DESCRIPTION,
+  },
 };
 
 export default function PastorsMessagePage() {
   return (
-    <div className="container mx-auto px-4 py-16 max-w-6xl">
-      {/* Page Header */}
-      <header className="mb-12 text-center">
-        <h1 className="font-heading text-4xl md:text-5xl font-bold text-primary mb-4">
-          Pastor&apos;s Message
-        </h1>
-      </header>
+    <div className="bg-white">
+      <section
+        className="relative pt-24 md:pt-32 pb-12 md:pb-16 overflow-hidden"
+        aria-labelledby="pastors-message-heading"
+      >
+        <p
+          className="absolute inset-x-0 top-16 md:top-24 text-center font-heading text-[6rem] sm:text-[9rem] md:text-[14rem] font-bold text-midnight/[0.03] select-none pointer-events-none leading-none tracking-tighter"
+          aria-hidden="true"
+        >
+          WELCOME
+        </p>
 
-      {/* Two-column layout: image left, message right */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-8 items-start">
-        {/* Couple's Photo (left) */}
-        <div className="md:col-span-2 flex justify-center md:justify-start">
-          <div className="relative h-72 w-72 md:h-96 md:w-full max-w-sm rounded-lg overflow-hidden shadow-lg">
-            <Image
-              src="/pastor-couple.jpeg" // Replace with actual file name
-              alt="Apostle Oghale B. Uwubiti and Rev. Abies Uwubiti Imarhia"
-              fill
-              className="object-cover"
-              priority
-            />
-          </div>
-        </div>
+        <div
+          className="pointer-events-none absolute -top-40 -right-40 w-96 h-96 rounded-full bg-accent/10 blur-3xl"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-midnight/5 blur-3xl"
+          aria-hidden
+        />
 
-        {/* Message Content (right) */}
-        <div className="md:col-span-3 bg-white rounded-lg shadow-md p-8 md:p-10">
-          <p className="text-gray-700 leading-relaxed mb-6">
-            Dear beloved,
+        <div className="relative w-full max-w-3xl mx-auto px-5 sm:px-6 text-center">
+          <p className="text-accent text-xs tracking-[0.3em] uppercase font-semibold mb-4">
+            About Us
           </p>
-          <p className="text-gray-700 leading-relaxed mb-6">
-            Welcome to The Lord&apos;s Hour Ministries, a people prepared for His
-            coming. It is our joy to have you visit with us, whether online or in
-            person. Our ministry is built upon the mandate to liberate mankind
-            from darkness into the marvellous light of Christ.
+          <h1
+            id="pastors-message-heading"
+            className="font-heading text-4xl sm:text-5xl md:text-6xl font-bold text-primary leading-[1.05] mb-6"
+          >
+            Pastor&apos;s Message
+          </h1>
+          <div className="w-16 h-1 bg-accent rounded-full mx-auto mb-6" aria-hidden />
+          <p className="text-gray-600 text-base md:text-lg leading-relaxed max-w-2xl mx-auto">
+            A word of welcome from the Founder and Senior Pastor of The
+            Lord&apos;s Hour Ministries.
           </p>
-          <p className="text-gray-700 leading-relaxed mb-6">
-            I encourage you to explore our site, learn more about our vision and
-            mission, and discover how you can be part of what God is doing through
-            this ministry. We would love to connect with you, pray with you, and
-            help you grow in your walk with God.
-          </p>
-          <p className="text-gray-700 leading-relaxed">
-            May the Lord bless you richly as you seek Him.
-          </p>
-          <p className="mt-8 font-semibold text-primary">
-            In His service,
-          </p>
-          <p className="font-heading text-xl font-bold">
-            Apostle Oghale B. Uwubiti
-          </p>
-          <p className="text-gray-600">Senior Pastor</p>
         </div>
-      </div>
+      </section>
+
+      <section
+        className="pb-16 md:pb-20"
+        aria-label="Pastor's letter"
+      >
+        <div className="w-full max-w-6xl mx-auto px-5 sm:px-6">
+          <PastorsLetter />
+        </div>
+      </section>
     </div>
   );
 }

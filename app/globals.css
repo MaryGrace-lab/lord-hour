@@ -72,3 +72,143 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* ─── Hero animations ─── */
+@keyframes heroKenBurns {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.06);
+  }
+}
+
+@keyframes heroProgress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .animate-ping,
+  [style*="heroKenBurns"],
+  [style*="heroProgress"] {
+    animation: none !important;
+  }
+}
+
+
+/* ─── Testimonies animations ─── */
+@keyframes testimonyInNext {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes testimonyInPrev {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes testimonyProgress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  [style*="testimonyIn"],
+  [style*="testimonyProgress"] {
+    animation-duration: 0.01ms !important;
+  }
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ─── Gallery animations ─── */
+@keyframes filterPillIn {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes lightboxIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  [style*="filterPillIn"],
+  [style*="lightboxIn"] {
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Google Translate widget
+   Only two things to hide: the top-of-page bar and the "Powered by"
+   logo. Everything else is styled lightly so the dropdown shows.
+   ══════════════════════════════════════════════════════════════ */
+
+/* ─── Google Translate: hidden widget, controlled by EN/IT toggle ─── */
+.google-translate-host {
+  position: absolute !important;
+  left: -9999px !important;
+  top: 0 !important;
+  width: 200px !important;
+  height: 40px !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Hide the "translated by Google" bar that appears at the top of the page */
+body > .skiptranslate,
+.skiptranslate > iframe.skiptranslate {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Google adds this class to <html> while translating. Slight shift is expected. */
+body {
+  top: 0 !important;
+}
