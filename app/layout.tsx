@@ -78,7 +78,7 @@ export const metadata: Metadata = {
     apple: "/favicon.ico",
   },
   verification: {
-  google: "google-site-verification: googleab737da5f11ed613.html", // the code from Google
+  google: "mmHFWvQyRcFF8X0guZ53TCouwFFVCMl0UQcWEI4TDJU", // the code from Google
   },
 };
 
