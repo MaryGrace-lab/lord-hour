@@ -75,6 +75,39 @@ const leaders: Leader[] = [
     bio: "Minister Stanley assists the branch pastor in the day-to-day operations and ministry of the Nigerian branch, serving the congregation faithfully.",
     // No image → will render initials avatar
   },
+    {
+    id: "owolabi",
+    name: "Oluwakemi Owolabi",
+    role: "Women Leader/Choir Director",
+    tier: "executive",
+    location: "San Donato, Italy",
+    flag: "🇮🇹",
+    image: "/oluwakemi-owolabi.jpeg",
+    bio: "Oluwakemi Owolabi serves as a women leader and choir director in our international ministry, providing guidance and support to the female congregation and leading the choir in worship.",
+    // No image → will render initials avatar
+  },
+  {
+    id: "joshua",
+    name: "Minister Joshua Owolabi",
+    role: "Program Director",
+    tier: "executive",
+    location: "San Donato, Italy",
+    flag: "🇮🇹",
+    image: "/minister-joshua.jpeg",
+    bio: "Minister Joshua oversees the program development and implementation for our international ministry, ensuring alignment with the vision and mission of the organization.",
+    // No image → will render initials avatar
+  },
+    {
+    id: "larry",
+    name: "Elder Larry Oboh",
+    role: "Elder of the Church",
+    tier: "executive",
+    location: "San Donato, Italy",
+    flag: "🇮🇹",
+    image: "/elder-larry.jpeg",
+    bio: "Elder Larry serves as an elder in our international ministry, providing spiritual guidance and leadership to the congregation."
+    // No image → will render initials avatar
+  },
 ];
 
 // ────────────────────────────────────────────────
