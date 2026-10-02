@@ -60,6 +60,7 @@ const leaders: Leader[] = [
     tier: "branch",
     location: "Benin City, Nigeria",
     flag: "🇳🇬",
+    image: "/pastor-martins.jpeg",
     bio: "Pastor Martins serves as the branch pastor for our Nigerian church in Benin City, providing leadership and shepherding to the congregation.",
     // No image → will render initials avatar
   },
@@ -70,6 +71,7 @@ const leaders: Leader[] = [
     tier: "branch",
     location: "Benin City, Nigeria",
     flag: "🇳🇬",
+    image: "/minister-stanley.jpeg",
     bio: "Minister Stanley assists the branch pastor in the day-to-day operations and ministry of the Nigerian branch, serving the congregation faithfully.",
     // No image → will render initials avatar
   },
