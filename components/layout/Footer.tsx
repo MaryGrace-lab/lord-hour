@@ -143,7 +143,17 @@ export function Footer() {
             <div className="flex flex-col md:flex-row items-center justify-between gap-4">
               <p className="text-gray-500 text-xs text-center md:text-left">
                 © {currentYear} The Lord&apos;s Hour Ministries. All rights
-                reserved.
+                reserved.{" "}
+                <span className="text-gray-600">·</span>{" "}
+                Built by{" "}
+                <a
+                  href="https://wa.me/2348109421176"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-accent hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+                >
+                  Mary Umoize
+                </a>
               </p>
 
               <ul className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
