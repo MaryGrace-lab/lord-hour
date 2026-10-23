@@ -105,8 +105,8 @@ For production environments:
 1. Clone the repository:
 
    ```bash
-   git clone YOUR_REPOSITORY_URL
-   cd YOUR_REPOSITORY_DIRECTORY
+   git clone https://github.com/MaryGrace-lab/lord-hour.git
+   cd lord-hour
    ```
 
 2. Install dependencies:
@@ -115,25 +115,24 @@ For production environments:
    npm install
    ```
 
-3. Create a local environment file:
+3. Environment Configuration:
 
-   ```bash
-   cp .env.example .env
-   ```
+   Configure the environment variables required by the application before running it locally. These may include database connection
+   settings and credentials for external services.
 
-   If no `.env.example` exists, use the actual environment-variable names referenced by the application to create a local `.env` file.
+   Keep all secrets and credentials private. Do not commit environment files containing sensitive values to GitHub.
 
-4. Configure the database connection and any required authentication, email, or Redis credentials.
+5. Configure the database connection and any required authentication, email, or Redis credentials.
 
-5. Run the database setup commands defined by the project's Prisma configuration and package scripts.
+6. Run the database setup commands defined by the project's Prisma configuration and package scripts.
 
-6. Start the development server using the configured development script. For a standard Next.js project:
+7. Start the development server using the configured development script. For a standard Next.js project:
 
    ```bash
    npm run dev
    ```
 
-7. Visit http://localhost:3000.
+8. Visit http://localhost:3000.
 
 ### Production Build
 
